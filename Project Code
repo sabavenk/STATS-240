@@ -1,0 +1,94 @@
+# Problem 1 
+## Part A
+
+Data Extraction
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+returns_risk_free = read.table(file = 'http://web.stanford.edu/~xing/statfinbook/_BookData/Chap03/m_sp500ret_3mtcm.txt',skip = 1,header = T)
+returns_risk_free$monthly_risk_free = ((1+(returns_risk_free$X3mTCM)/100)^(1/12))-1
+returns_risk_free$market_excess = returns_risk_free$sp500-(returns_risk_free$X3mTCM/100)
+returns_ten_stocks = read.table(file = 'http://web.stanford.edu/~xing/statfinbook/_BookData/Chap03/m_ret_10stocks.txt',header = T)
+returns = cbind(returns_risk_free,returns_ten_stocks)
+plot(x=returns$Date,y=returns$AAPL)
+```
+
+Principal Component Calculation
+```{r principal_components}
+
+princomponents = princomp(returns[1:102,7:16],cor = T)
+(comp_means = princomponents$center)
+#(comp_means = c(mean(scores[,1]),mean(scores[,2]),mean(scores[,3]),mean(scores[,4]),mean(scores[,5]),mean(scores[,6]),mean(scores[,7]),mean(scores[,8]),mean(scores[,9]),mean(scores[,10])))
+(comp_vars = princomponents$sdev^2)
+
+target_return = 0.03
+comp_covar= cor(princomponents$scores)
+
+library(MASS)
+# Markowitz
+A = t(comp_means)%*%ginv(comp_covar)%*%c(rep(1,10))
+B = t(comp_means)%*%ginv(comp_covar)%*%comp_means
+C = c(rep(1,10))%*%ginv(comp_covar)%*%c(rep(1,10))
+D = B*C - (A^2)
+
+w_eff = (as.numeric(B)*(ginv(comp_covar)%*%c(rep(1,10))) - as.numeric(A)*ginv(comp_covar)%*%comp_means + target_return*(as.numeric(C)*ginv(comp_covar)%*%comp_means - as.numeric(B)*ginv(comp_covar)%*%c(rep(1,10))))/as.numeric(D)
+(w_eff = w_eff/sum(w_eff))
+```
+
+## Part B
+```{r partb}
+mar_ret = as.matrix(returns[103:nrow(returns),7:16])%*%w_eff
+cum_ret = c(mar_ret[1,],rep(NA,nrow(mar_ret)-1))
+for(i in 2:nrow(mar_ret)) {
+  cum_ret[i] = cum_ret[i-1]+mar_ret[i]
+}
+months = factor(substr(returns$Date,start = 1,stop = 3),levels = c('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'),ordered = T)
+year = as.numeric(substr(returns$Date,start = 5,stop = 6))
+returns$months = months
+returns$years = year
+returns[returns$months=='Jan','years']=as.numeric(returns[returns$months=='Jan','years'])+(0/12)
+returns[returns$months=='Feb','years']=as.numeric(returns[returns$months=='Feb','years'])+(1/12)
+returns[returns$months=='Mar','years']=as.numeric(returns[returns$months=='Mar','years'])+(2/12)
+returns[returns$months=='Apr','years']=as.numeric(returns[returns$months=='Apr','years'])+(3/12)
+returns[returns$months=='May','years']=as.numeric(returns[returns$months=='May','years'])+(4/12)
+returns[returns$months=='Jun','years']=as.numeric(returns[returns$months=='Jun','years'])+(5/12)
+returns[returns$months=='Jul','years']=as.numeric(returns[returns$months=='Jul','years'])+(6/12)
+returns[returns$months=='Aug','years']=as.numeric(returns[returns$months=='Aug','years'])+(7/12)
+returns[returns$months=='Sep','years']=as.numeric(returns[returns$months=='Sep','years'])+(8/12)
+returns[returns$months=='Oct','years']=as.numeric(returns[returns$months=='Oct','years'])+(9/12)
+returns[returns$months=='Nov','years']=as.numeric(returns[returns$months=='Nov','years'])+(10/12)
+returns[returns$months=='Dec','years']=as.numeric(returns[returns$months=='Dec','years'])+(11/12)
+
+plot(x=returns[103:nrow(returns),'years']+2000,y=cum_ret,main='Cumulative Excess Returns',xlab='Date')
+```
+
+
+
+
+## Problem 2
+## Part A
+
+library(timeSeries)
+
+nasdaq = read.table(file='http://web.stanford.edu/~xing/statfinbook/_BookData/Chap06/nasdaq_w_logret.txt',header = T)
+
+garch_mod = garch(nasdaq$logreturn, order = c(1,1))
+
+
+## Part B
+
+nas_1 = nasdaq[1:128,]
+nas_2 = nasdaq[128:300,]
+nas_3 = nasdaq[300:695,]
+nas_4 = nasdaq[694:982,]
+
+mod_1 = garch(nas_1$logreturn, order = c(1,1))
+mod_2 = garch(nas_2$logreturn, order = c(1,1))
+mod_3 = garch(nas_3$logreturn, order = c(1,1))
+mod_4 = garch(nas_4$logreturn, order = c(1,1))
+
+NOTE: The Garch function was not working when the PDF was knitted but worked fine on the console. I just used the numbers there to obtain the model parameters.
+
+## Part C
+
+It's clear from the data that the parameters are different for each period and thus fitting the entire data to a time series as in part A may not be a good idea. 
+
