@@ -1,0 +1,104 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+3.6 a.)
+
+```{r}
+stock_data<-read.table("/Users/Adi/Documents/m_logret_10stocks.txt", header = T)
+market_data <-read.table("/Users/Adi/Documents/m_sp500ret_3mtcm.txt", skip = 1, header = T)
+Rf_annual = (1+market_data$X3mTCM/100)^(1/12) - 1
+Exp_Return = market_data$sp500 - Rf_annual
+return_data = stock_data[,2:11]
+Risk_Prem = return_data - Rf_annual
+stock_ticker = colnames(return_data)
+for (i in 1:ncol(return_data)) {
+  print(stock_ticker[i])
+  CAPM = lm(Risk_Prem[,i]~Exp_Return)
+  coef(CAPM)
+  
+  Sharpe_Index = mean(Risk_Prem[,i])/sd(Risk_Prem[,i])
+  print(paste("Sharpe_Index:",Sharpe_Index))
+  
+  Treynor_Index = mean(Risk_Prem[,i])/coef(CAPM)[2]
+  print(paste("Treynor_Index:",Treynor_Index))
+  
+  confint(CAPM,0.95)
+}
+
+```
+
+b.) 
+```{r}
+m = nrow(Risk_Prem)
+n = ncol(Risk_Prem)
+samples = 300
+
+alpha_vec = array(0,c(samples,n))
+beta_vec = array(0,c(samples,n))
+Sharpe_Index_vec =  array(0,c(samples,n))
+Treynor_Index_vec = array(0,c(samples,n))
+
+for (i in 1:samples) {
+
+  rnd_index = sample(1:m, replace = T, m)
+  Risk_Prem_boot = Risk_Prem[rnd_index,]
+for (j in 1:n) {
+  
+  CAPM_mod = lm(Risk_Prem[,j] ~ Exp_Return)
+  alpha_vec[i,j] = coef(CAPM_mod)[1]
+  beta_vec[i,j] = coef(CAPM_mod)[2]
+  Sharpe_Index_vec[i,j]=mean(Risk_Prem_boot[,j])/sd(Risk_Prem_boot[,j])
+  Treynor_Index_vec[i,j]=mean(Risk_Prem_boot[,j])/coef(CAPM_mod)[2]
+
+  }
+}
+
+for (i in 1:10) {
+ print(paste("SE_alpha =",sd(alpha_vec[,i])))
+  print(paste("SE_beta =",sd(beta_vec[,i])))
+  print(paste("SE_Sharpe_Index=", sd(Sharpe_Index_vec[,i])))
+  print(paste("SE_Treynor_Index = ", sd(Treynor_Index_vec[,i])))
+  }
+  
+ 
+```      
+      
+
+4.7 
+a.)
+```{r}
+  Beta_vec = rep(0,10)
+  return_var = array(0, c(10,10))
+  
+  for (i in 1:ncol(return_data)) {
+    print(stock_ticker[i])
+    CAPM = lm(return_data[,i]~market_data$sp500)
+    Beta_vec[i] = coef(CAPM)[2]
+    return_var[i,i] = var(return_data[,i]) 
+  }
+  
+  market_var = var(market_data$sp500)*Beta_vec%*%t(Beta_vec)
+  F = market_var + return_var
+  print(F)
+```
+c.)
+
+```{r}
+  comps = prcomp(return_data, scale = T)
+  ret_data = apply(return_data, 2, scale)
+  pca_data = ret_data %*% comps$rotation
+  pca_1 = pca_data[,1]
+  pca_2 = pca_data[,2]
+  
+  pca_mod = lm(as.matrix(return_data)~pca_1 + pca_2)
+  
+  pca_beta_1 = coef(pca_mod)[2,]
+  pca_beta_2 = coef(pca_mod)[3,]
+  
+  F_pca = var(pca_1)*pca_beta_1%*%t(pca_beta_1) + var(pca_2)*pca_beta_2%*%t(pca_beta_2) + return_var
+  
+  print(F)
+  
+```
