@@ -1,0 +1,164 @@
+## R Markdown
+
+5.8
+
+a.)
+```{r}
+exch_data = read.table("/Users/Adi/Documents/m_caus_ex.txt", skip = 1)
+colnames(exch_data)[1] = "Date"
+colnames(exch_data)[2] = "Rate"
+exch_subset<-exch_data[1:432,]
+
+library(tseries)
+library(forecast)
+
+Rate_series = as.ts(exch_subset$Rate)
+plot(Rate_series, main = "US-Canada Currency Exchange Rates", xlab = "Months", ylab = "Rate")
+acf(Rate_series)
+
+adf.test(Rate_series)
+
+
+```
+
+From the plot of the autocorrelation function, there are no oscillatory patterns, indicating no seasonality effects. The p-value of the Augmented Dickey-Fuller test for unit-root non-stationary patterns is above 0.99, meaning we fail to reject the null hypothesis and conclude there are infact non-stationary patterns. 
+
+b.)
+
+```{r}
+
+auto.arima(Rate_series)
+exch_model <- arima(Rate_series, order = c(0,2,2))
+
+
+```
+
+Here we use the built-in auto.arima function that performs the model-selection for the time series by determining the (p,d,q) parameters of ARIMA(p,d,q) that yield the smallest AIC and BIC values. This results in an ARIMA(0,2,2) model.
+
+c.)
+
+```{r}
+
+x = predict(exch_model, 6)
+x$pred
+
+```
+The model predictions are relatively close for January and February but are more than 5% off for the rest of the months. 
+
+
+6.3
+
+a.)
+```{r}
+
+stock_data = read.table("/Users/Adi/Documents/w_logret_3stocks.txt", header = T)
+
+for (i in 2:4) {
+  
+  mean(stock_data[,i])
+  var(stock_data[,i])
+  skewness(stock_data[,i])
+  kurtosis(stock_data[,i])
+  for(j in 1:10){
+ 
+       Box.test(stock_data[,i], lag = j)
+  }
+}
+
+
+```
+
+b.)
+```{r}
+citi_ts = as.ts(stock_data$Citi)
+pfe_ts = as.ts(stock_data$PFE)
+gm_ts = as.ts(stock_data$GM)
+
+citi_sq = as.ts((stock_data$Citi)^2)
+pfe_sq = as.ts((stock_data$PFE)^2)
+gm_sq = as.ts((stock_data$GM)^2)
+
+hist(citi_ts)
+hist(pfe_ts)
+hist(gm_ts)
+
+hist(citi_sq)
+hist(pfe_sq)
+hist(gm_sq)
+
+```
+c.)
+
+```{r}
+jarque.bera.test(citi_ts)
+jarque.bera.test(pfe_ts)
+jarque.bera.test(gm_ts)
+
+```
+We reject the null hypothesis for all stocks and conclude that the log returns are in fact not normally distributed. 
+
+d.)
+
+```{r}
+acf(citi_ts)
+acf(citi_sq)
+
+acf(pfe_ts)
+acf(pfe_sq)
+
+acf(gm_ts)
+acf(gm_sq)
+
+```
+It's clear for all stocks that the squared log returns time series shows much stronger autocorrelations than the log returns time series.
+
+6.4
+
+a.)
+
+```{r}
+intel_data = read.table("/Users/Adi/Documents/intel_d_logret.txt", header = T)
+intel_series = as.ts(intel_data$logret)
+intel_sq = intel_series^2
+
+acf(intel_series)
+for (i in 1:10) {
+  Box.test(intel_series, lag = i, type = "Ljung-Box")
+}
+
+
+acf(intel_sq)
+for (i in 1:10) {
+  Box.test(intel_sq, lag = i, type = "Ljung-Box")
+}
+```
+From the Ljung-Box test results, we see that autocorrelations upto lag 10 are 0 for the originial returns series and non-zero for the squared return series. This is confirmed by the autocorrelation function graphs for each series. Thus, we have strong evidence of conditional heteroskedasticity.
+
+b.)
+
+```{r}
+
+intel_mod = garch(intel_series,order = c(1,1))
+Est_innov = intel_mod$residuals
+Est_innov = Est_innov[2:5292]
+innov = as.ts(Est_innov)
+
+acf(innov)
+
+for (i in 1:10) {
+  Box.test(innov, lag = i, type = "Ljung-Box")
+}
+```
+Based on the p-values of the Ljung-box tests of the estimated innovations, we fail to reject the null hypothesis, thus concluding these innovations are not serially correlated. 
+
+c.)
+
+```{r}
+library(fGarch)
+intel_pred = garchFit(~garch(1,1),intel_series)
+
+(x = predict(intel_pred))
+
+(Lower_Bound = x$meanForecast - 2*(x$standardDeviation))
+(Upper_Bound = x$meanForecast + 2*(x$standardDeviation))
+```
